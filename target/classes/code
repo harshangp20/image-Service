@@ -1,0 +1,283 @@
+//    @Value("${images.folder}")
+//    private String imageFolder;
+//
+//    @Value("${images.size}")
+//    private String imageSize;
+//private  BufferedImage createThumbnail(MultipartFile originalImage ) throws IOException {
+//
+//        BufferedImage originalBufferedImage = null;
+//        try {
+//            originalBufferedImage = ImageIO.read (new File("\\images\\"));
+//        } catch (IOException e) {
+//
+//            System.out.println(" IO exception occured while trying to read image" );
+//            throw e;
+//        }
+//
+//        int thumbnailWidth = 150;
+//
+//        int widthToScale, heightToScale;
+//
+//        if ( originalBufferedImage.getWidth() > originalBufferedImage.getHeight() ){
+//
+//            heightToScale = (int) (1.1 * thumbnailWidth);
+//            widthToScale = (int) (( heightToScale * 1.0 ) /
+//                                           originalBufferedImage.getHeight() *
+//                                           originalBufferedImage.getWidth());
+//
+//        } else {
+//            widthToScale = (int) ( 1.1 * thumbnailWidth );
+//            heightToScale = (int) ( ( thumbnailWidth * 1.0 ) /
+//                                      originalBufferedImage.getWidth() *
+//                                      originalBufferedImage.getHeight() );
+//        }
+//
+//        BufferedImage resizedImage =new BufferedImage(
+//                                             widthToScale,
+//                                             heightToScale,
+//                                             originalBufferedImage.getType()) ;
+//
+//        Graphics2D graphics2D = resizedImage.createGraphics();
+//
+//        graphics2D.setComposite( AlphaComposite.Src );
+//        graphics2D.setRenderingHint( RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR );
+//        graphics2D.setRenderingHint( RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY );
+//        graphics2D.setRenderingHint( RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON );
+//
+//        graphics2D.drawImage( originalBufferedImage, 0, 0, widthToScale, heightToScale, null );
+//        graphics2D.dispose();
+//
+//        int x = ( resizedImage.getWidth() - thumbnailWidth ) / 2;
+//        int y = ( resizedImage.getHeight() - thumbnailWidth ) / 2;
+//
+//        if ( x < 0 || y < 0 ) {
+//            throw new IllegalArgumentException( " Width of new thumbnail is bigger than original image" );
+//        }
+//
+//        BufferedImage thumbnailBufferedImage = resizedImage.getSubimage( x, y, thumbnailWidth, thumbnailWidth );
+//
+//        try {
+//            ImageIO.write( thumbnailBufferedImage, "JPG" , new File(" \\images\\") );
+//        }
+//        catch ( IOException ioException ) {
+//            System.out.println(" Error writing image to file ");
+//            throw ioException;
+//        }
+//
+//        return thumbnailBufferedImage;
+//    }
+
+//
+//    @Value("${images.folder}")
+//    private String imageFolder;
+//
+//    @Value("${images.size}")
+//    private String imageSize;
+//    private ByteArrayOutputStream createThumbnail(MultipartFile originalImage, long width) throws IOException{
+//
+//        ByteArrayOutputStream thumbOutput = new ByteArrayOutputStream();
+//        BufferedImage thumbImg = null;
+//        BufferedImage image = ImageIO.read(originalImage.getInputStream());
+//        thumbImg = Scalr.resize( image,
+//                                 Scalr.Method.AUTOMATIC,
+//                                 Scalr.Mode.AUTOMATIC,
+//                                 (int) width,
+//                                 Scalr.OP_ANTIALIAS);
+//        ImageIO.write(thumbImg, originalImage.getContentType().split("/")[1], thumbOutput);
+//        return thumbOutput;
+//
+//    }
+//    @Value("${images.folder}")
+//    private String imageFolder;
+//
+//    @Value("${images.size}")
+//    private String imageSize;
+//
+//    private Logger logger = LoggerFactory.getLogger(ImageServiceImpl.class);
+
+//    @Override
+//    public String resizeImage(MultipartFile sourceFile) {
+//
+//        try {
+//
+//            BufferedImage bufferedImage = ImageIO.read(sourceFile.getInputStream());
+//            BufferedImage outputImage = Scalr.resize(bufferedImage, Integer.parseInt(imageSize));
+//            String newFileName = FilenameUtils.getBaseName(sourceFile.getName())
+//                    + "_" + imageSize.toString() + "."
+//                    + FilenameUtils.getExtension(sourceFile.getName());
+//            Path path = Paths.get(imageFolder,newFileName);
+//            File newImageFile = path.toFile();
+//            ImageIO.write(outputImage,"jpg", newImageFile);
+//            outputImage.flush();
+//
+//        }
+//        catch (IOException e){
+//            logger.error(e.getMessage(),e);
+//        }
+//        String message = "Task Completed";
+//        return null;
+//    }
+//    @GetMapping("/getBufferedImage/{bufferedImage}")
+//    public UploadImageResponse getResizeImage(@PathVariable MultipartFile bufferedImage, String message, HttpServletRequest httpServletRequest) {
+//
+//        String imageName = imageService.getResizedImage(bufferedImage);
+//        String imageDownloadUri = ServletUriComponentsBuilder
+//                .fromCurrentContextPath()
+//                .path("/downloadImage/")
+//                .path(imageName)
+//                .toUriString();
+//        return new UploadImageResponse( imageName
+//                , imageDownloadUri
+//                , bufferedImage.getContentType()
+//                , bufferedImage.getSize() );
+//    }
+    ResizeConfiguration resizeConfiguration;
+
+
+    @Value("${images.folder}")
+    private String imageFolder;
+
+    @Value("${images.size}")
+    private String imageSize;
+    @Override
+    public BufferedImage resize(MultipartFile bufferedImage, String type) {
+
+        JsonObject configuration = resizeConfiguration.getconfiguration(type);
+        if (configuration == null){
+            throw new RuntimeException(HttpStatus.INTERNAL_SERVER_ERROR + "configuration is not available: " + type);
+        }
+        final int height = configuration.getAsJsonPrimitive("height").getAsByte();
+        final int width = configuration.getAsJsonPrimitive("Width").getAsByte();
+
+        try {
+            return Thumbnails.of((BufferedImage) bufferedImage)
+                    .height(height)
+                    .width(width)
+                    .asBufferedImage();
+        } catch (IOException e) {
+            throw new RuntimeException( HttpStatus.INTERNAL_SERVER_ERROR + "Image could not be resized to type" + e );
+        }
+    }
+
+    class ResizeConfiguration {
+
+        private JsonObject jsonObject;
+
+        private final String RESIZE_CONFIGURATION = "resize_configuration.json";
+
+        private ResizeConfiguration() throws RuntimeException {
+            ClassLoader classLoader = getClass().getClassLoader();
+            try{
+                String result = IOUtils.toString(classLoader.getResourceAsStream(RESIZE_CONFIGURATION));
+                Gson gson = new Gson();
+                jsonObject = gson.fromJson(result,JsonObject.class);
+            } catch (IOException e) {
+                throw new RuntimeException(HttpStatus.INTERNAL_SERVER_ERROR +
+                                RESIZE_CONFIGURATION);
+            }
+        }
+
+        public JsonObject getconfiguration(String type) {
+            return jsonObject.getAsJsonObject(type);
+        }
+    }
+  public void saveScaledImage(String filePath, String outputFile) {
+
+        try {
+
+            BufferedImage sourceImage = ImageIO.read(new File(filePath));
+            int width = sourceImage.getWidth();
+            int height = sourceImage.getHeight();
+
+            if (width > height) {
+
+                float extraSize = height - 100;
+                float percentHeight = (extraSize/height) * 100;
+                float percentwidth = width - ((width/100)* percentHeight);
+                BufferedImage img = new BufferedImage((int) percentwidth,100, BufferedImage.TYPE_INT_RGB);
+                Image scaleImage = sourceImage.getScaledInstance((int) percentwidth, 100, Image.SCALE_SMOOTH);
+                img.createGraphics().drawImage(scaleImage,0,0,null);
+                BufferedImage img2 = new BufferedImage(100,100,BufferedImage.TYPE_INT_RGB);
+                img2 = img.getSubimage((int) ((percentwidth-100)/2), 0, 100, 100);
+
+                ImageIO.write(img2,"jpg",new File(outputFile));
+
+            } else {
+
+                float extraSize = width -100;
+                float percentWidth = (extraSize/height) * 100;
+                float percentHeight = height - ((height/100)*percentWidth);
+                BufferedImage img = new BufferedImage(
+                        100,
+                        (int) percentHeight,
+                        Image.SCALE_SMOOTH);
+                Image scaledImage = sourceImage.getScaledInstance(100,
+                        (int) percentHeight,
+                        Image.SCALE_SMOOTH);
+                img.createGraphics().drawImage(scaledImage,0,0,null);
+                BufferedImage img2 = new BufferedImage(100,100,BufferedImage.TYPE_INT_RGB);
+                img2 = img.getSubimage(0, (int) ((percentHeight-100)/2),100,100);
+
+                ImageIO.write(img2,"jpg", new File(outputFile));
+
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+try {
+        Path filePath = this.imageStorageLocation.resolve(imageName).normalize();
+        Resource resource = new UrlResource(filePath.toUri());
+        if (resource.exists()) {
+        return resource;
+        } else {
+        throw new RuntimeException("File not found " + imageName);
+        }
+        } catch (MalformedURLException ex) {
+        throw new RuntimeException("File not found " + imageName, ex);
+        }
+
+
+//
+//    public String storeImage(MultipartFile image,String folder) {
+//
+//        String imageName = StringUtils.cleanPath(image.getOriginalFilename());
+//        String imageName = image.getOriginalFilename();
+//        String contentType = image.getContentType();
+//
+//        try {
+//            Path targetLocation = this.imageStorageLocation.resolve(imageName);
+//            Path targetLocation2 = this.imageStorageLocation.resolve(contentType);
+//
+//           Files.copy(image.getInputStream(),
+//                    targetLocation,
+//                    StandardCopyOption.REPLACE_EXISTING);
+//           Files.copy(image.getInputStream(),
+//                   targetLocation2,
+//                   StandardCopyOption.REPLACE_EXISTING);
+//            return imageName + contentType;
+//        } catch (IOException e) {
+//            throw new RuntimeException(" Could not store image " + imageName + ". Please try again! " + e);
+//        }
+//    }
+
+
+
+
+
+
+
+ else {
+
+                filePath = videoImageStorageLocation.resolve(fileName).normalize();
+                System.out.println("The path of video is => " + filePath);
+                resource = new UrlResource(filePath.toUri());
+                System.out.println(" Your resource is stored at => " + resource);
+
+            }
+            if ( resource.exists() ) {
+                return resource;
+            }

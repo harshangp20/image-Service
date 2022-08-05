@@ -1,0 +1,6 @@
+com/tridhyaintuit/image/service/serviceImpl/ImageServiceImpl.class
+com/tridhyaintuit/image/model/FileStorageProperties.class
+com/tridhyaintuit/image/utils/ImageThumbnail.class
+com/tridhyaintuit/image/utils/FileConfig.class
+com/tridhyaintuit/image/model/FileResponse.class
+com/tridhyaintuit/image/service/ImageService.class
